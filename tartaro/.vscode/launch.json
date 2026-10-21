@@ -1,0 +1,20 @@
+{
+	// F5 roda o jogo pelo Godot (extensão godot-tools).
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Jogar Tártaro (menu)",
+			"type": "godot",
+			"request": "launch",
+			"project": "${workspaceFolder}",
+			"scene": "main"
+		},
+		{
+			"name": "Rodar cena aberta",
+			"type": "godot",
+			"request": "launch",
+			"project": "${workspaceFolder}",
+			"scene": "current"
+		}
+	]
+}

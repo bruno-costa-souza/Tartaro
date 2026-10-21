@@ -1,0 +1,18 @@
+{
+  "frame_size": 192,
+  "directions": 8,
+  "frames": {
+    "idle": 8,
+    "walk": 8,
+    "attack": 6,
+    "dash": 4
+  },
+  "fps": {
+    "idle": 8,
+    "walk": 12,
+    "attack": 16,
+    "dash": 14
+  },
+  "feet_y": 147.8,
+  "px_per_meter": 71.11
+}

@@ -1,0 +1,13 @@
+{
+	"godotTools.editorPath.godot4": "/Applications/Godot.app/Contents/MacOS/Godot",
+	"files.exclude": {
+		"**/.godot": true,
+		"**/*.import": true,
+		"**/*.uid": true,
+		"build": true
+	},
+	"[gdscript]": {
+		"editor.insertSpaces": false,
+		"editor.tabSize": 4
+	}
+}

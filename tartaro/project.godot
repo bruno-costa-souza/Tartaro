@@ -1,0 +1,45 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="Tartaro"
+run/main_scene="res://scenes/menu.tscn"
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0.055, 0.035, 0.07, 1)
+boot_splash/show_image=false
+config/features=PackedStringArray("4.7", "Mobile")
+
+[autoload]
+
+Save="*res://scripts/save.gd"
+Music="*res://scripts/music.gd"
+Divine="*res://scripts/divine.gd"
+
+[display]
+
+window/size/viewport_width=360
+window/size/viewport_height=640
+window/size/window_width_override=405
+window/size/window_height_override=780
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep_width"
+window/handheld/orientation=1
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/canvas_textures/default_texture_filter=1
+anti_aliasing/quality/msaa_2d=2
+viewport/hdr_2d=true
+2d/shadow_atlas/size=2048
+textures/vram_compression/import_etc2_astc=true
+
+[gui]
+
+theme/custom_font="res://ui/body_font.tres"

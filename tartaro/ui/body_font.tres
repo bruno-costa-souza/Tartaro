@@ -1,0 +1,5 @@
+[gd_resource type="SystemFont" format=3]
+
+[resource]
+font_names = PackedStringArray("Avenir Next", "Optima", "Helvetica Neue", "Arial", "sans-serif")
+font_weight = 600

@@ -1,0 +1,10 @@
+.godot/
+**/.godot/
+
+**/build/
+
+**/_frames/
+
+.DS_Store
+.claude/
+__pycache__/
