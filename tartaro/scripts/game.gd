@@ -112,6 +112,7 @@ func _ready() -> void:
 	hud.retry_pressed.connect(_retry)
 	hud.menu_pressed.connect(_to_menu)
 	hud.pause_pressed.connect(_open_pause)
+	hud.powers_pressed.connect(_open_powers)
 
 	_enter_room("")
 
@@ -400,6 +401,7 @@ func _telegraph_spawn(pos: Vector2, kind: Enemy.Kind, elite: bool, delay: float)
 	_pending_spawns -= 1
 	if is_game_over:
 		return
+	sfx.play("spawn", randf_range(0.9, 1.15))
 	spawn_enemy(kind, pos, elite)
 
 
@@ -438,6 +440,7 @@ func _on_room_cleared() -> void:
 
 
 func _open_exits() -> void:
+	sfx.play("doors")
 	room.open_doors(_roll_door_rewards())
 	if (room_index + 1) % GameData.ROOMS_PER_BIOME == GameData.ROOMS_PER_BIOME - 1:
 		await get_tree().create_timer(1.4, false).timeout
@@ -503,10 +506,12 @@ func _grant_reward(reward: String) -> void:
 		"heal":
 			var h := ceili(player.max_hp * 0.4)
 			player.heal(h)
+			sfx.play("heal")
 			_queue_message("AMBROSIA  +%d VIDA" % h)
 		"maxhp":
 			player.max_hp += 10
 			player.heal(10)
+			sfx.play("heal", 0.9)
 			_queue_message("+10 VIDA MÁXIMA")
 		"forge":
 			forge += 1
@@ -520,6 +525,7 @@ func _start_boss() -> void:
 	var token := _room_token
 	_pending_spawns += 1
 	hud.show_boss_intro(info["name"], info["title"])
+	sfx.play("boss_intro")
 	await get_tree().create_timer(1.8, false).timeout
 	if is_game_over or token != _room_token:
 		return
@@ -539,7 +545,7 @@ func on_boss_phase(b: Boss) -> void:
 	camera.add_trauma(0.7)
 	hitstop(0.15)
 	haptic(50)
-	sfx.play("levelup", 0.6)
+	sfx.play("boss_phase")
 	spawn_burst(b.position + Vector2(0, -10), Color("ff3b3b"), 30)
 
 
@@ -565,7 +571,7 @@ func _on_boss_killed(b: Boss) -> void:
 	camera.add_trauma(1.0)
 	hitstop(0.3)
 	haptic(120)
-	sfx.play("levelup", 0.8)
+	sfx.play("boss_death")
 	boss = null
 	_boss_slowmo()
 
@@ -712,7 +718,7 @@ func explode(pos: Vector2, radius: float, dmg: int, color: Color, hurts_player: 
 	t.chain().tween_callback(ring.queue_free)
 	spawn_burst(pos, color, 10)
 	camera.add_trauma(0.2)
-	sfx.play("kill", 0.5)
+	sfx.play("explode", randf_range(0.9, 1.1))
 
 
 func spawn_meteor(pos: Vector2, dmg: int, delay: float) -> void:
@@ -725,6 +731,7 @@ func spawn_meteor(pos: Vector2, dmg: int, delay: float) -> void:
 		marker.draw_circle(Vector2.ZERO, 22, Color(1, 0.55, 0.2, 0.2))
 		marker.draw_arc(Vector2.ZERO, 22, 0, TAU, 24, Color(1, 0.55, 0.2, 0.9), 1.0))
 	world.add_child(marker)
+	sfx.play("meteor", randf_range(0.92, 1.08))
 	marker.scale = Vector2(0.2, 0.2)
 	marker.create_tween().tween_property(marker, "scale", Vector2.ONE, delay)
 	await get_tree().create_timer(delay, false).timeout
@@ -817,7 +824,10 @@ func on_enemy_hit(enemy: Enemy, amount: int, crit: bool, status: bool) -> void:
 		return
 	spawn_damage_number(enemy.position, amount, crit)
 	camera.add_trauma(0.12 if crit else 0.07)
-	sfx.play("hit", randf_range(0.9, 1.1) * (0.8 if crit else 1.0))
+	if crit:
+		sfx.play("crit", randf_range(0.95, 1.05))
+	else:
+		sfx.play("hit", randf_range(0.9, 1.1))
 
 
 func on_enemy_killed(enemy: Enemy, by_player := true) -> void:
@@ -868,6 +878,25 @@ func on_player_hurt() -> void:
 		explode.call_deferred(player.position, 50.0, roundi(8 * boon("nemesis")), Color("c0392b"), false)
 
 
+func on_footstep(pos: Vector2) -> void:
+	sfx.play("step", randf_range(0.85, 1.15))
+	if Save.low_fx:
+		return
+	var puff := Node2D.new()
+	puff.position = pos + Vector2(0, 1)
+	puff.z_index = -1
+	var tint: Color = biome()["floor_a"].lightened(0.35)
+	puff.draw.connect(func():
+		puff.draw_set_transform(Vector2.ZERO, 0, Vector2(1.0, 0.5))
+		puff.draw_circle(Vector2(-2, 0), 3.0, Color(tint, 0.45))
+		puff.draw_circle(Vector2(2, -1), 2.2, Color(tint, 0.35)))
+	world.add_child(puff)
+	var t := puff.create_tween().set_parallel(true)
+	t.tween_property(puff, "scale", Vector2(2.2, 2.2), 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	t.tween_property(puff, "modulate:a", 0.0, 0.35)
+	t.chain().tween_callback(puff.queue_free)
+
+
 func on_player_dash() -> void:
 	sfx.play("dash", randf_range(0.95, 1.1))
 	haptic(8)
@@ -915,6 +944,7 @@ func _try_open_panel() -> void:
 	_current_req = req
 	_choosing = true
 	get_tree().paused = true
+	Music.duck(true)
 	controls.reset()
 	hud.hide_banner()
 	haptic(30)
@@ -928,6 +958,7 @@ func _try_open_panel() -> void:
 	if panel.voiced:
 		_last_voice_ms = now
 	panel.picks = picks
+	panel.totals = boons
 	panel.chosen.connect(_on_boon_chosen)
 	add_child(panel)
 
@@ -999,6 +1030,7 @@ func _on_boon_chosen(offer: Dictionary) -> void:
 	hud.set_boons(picks)
 	_choosing = false
 	get_tree().paused = false
+	Music.duck(false)
 	if _current_req.get("orb", false):
 		_open_exits()
 	_current_req = {}
@@ -1032,6 +1064,8 @@ func _spawn_boon_orb(reward: String) -> void:
 
 func _on_player_died() -> void:
 	is_game_over = true
+	sfx.play("death")
+	Music.stop(2.0)
 	spawn_burst(player.position + Vector2(0, -5), Player.COLOR_CLOAK, 24)
 	camera.add_trauma(0.8)
 	var earned := _bank_run()
@@ -1058,8 +1092,9 @@ func _open_pause() -> void:
 	if is_game_over or _pause_sheet or _choosing:
 		return
 	get_tree().paused = true
+	Music.duck(true)
 	controls.reset()
-	sfx.play("xp", 1.1)
+	Music.ui("open")
 	var quit := UI.button("Abandonar run", Color("ff5e57"), 11)
 	var armed := [false]
 	quit.pressed.connect(func():
@@ -1080,11 +1115,27 @@ func _open_pause() -> void:
 	add_child(layer)
 
 
+func _open_powers() -> void:
+	if is_game_over or _pause_sheet or _choosing:
+		return
+	get_tree().paused = true
+	Music.duck(true)
+	controls.reset()
+	Music.ui("open")
+	_pause_sheet = PowersSheet.build(self, _close_pause)
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	layer.add_child(_pause_sheet)
+	add_child(layer)
+
+
 func _close_pause() -> void:
 	if _pause_sheet:
 		_pause_sheet.get_parent().queue_free()
 		_pause_sheet = null
 	get_tree().paused = false
+	Music.duck(false)
 
 
 func _notification(what: int) -> void:
@@ -1094,11 +1145,13 @@ func _notification(what: int) -> void:
 
 func _retry() -> void:
 	Engine.time_scale = 1.0
+	Music.duck(false)
 	get_tree().reload_current_scene()
 
 
 func _to_menu() -> void:
 	Engine.time_scale = 1.0
+	Music.duck(false)
 	get_tree().change_scene_to_file("res://scenes/menu.tscn")
 
 

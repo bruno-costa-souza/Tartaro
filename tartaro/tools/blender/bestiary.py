@@ -6,7 +6,7 @@ Run (headless), from the project root:
     BESTIARY_PREVIEW=1 blender -b -P tools/blender/bestiary.py -- all <dir>   # one test frame each
 
 Each character gets art/<id>/move.png, attack.png and meta.json.
-Reuses the scene/material/geometry helpers from hero.py.
+Reuses the scene/material/geometry helpers from kit.py.
 """
 
 import bpy
@@ -20,7 +20,7 @@ import numpy as np
 from mathutils import Vector
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import hero as H
+import kit as H
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 WHICH = ARGS[0] if ARGS else "all"

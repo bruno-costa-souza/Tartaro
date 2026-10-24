@@ -4,6 +4,7 @@ extends CanvasLayer
 signal retry_pressed
 signal menu_pressed
 signal pause_pressed
+signal powers_pressed
 
 const VITALS_W := 172.0
 const VITALS_H := 46.0
@@ -18,6 +19,7 @@ var _score: Label
 var _room: Label
 var _coins: Label
 var _combo: Label
+var _powers_badge: Label
 var _seed: Label
 var _banner: Label
 var _hint: Label
@@ -89,6 +91,29 @@ func _ready() -> void:
 	pause.pressed.connect(func(): pause_pressed.emit())
 	_root.add_child(pause)
 
+	var powers := UI.button("", UI.GOLD, 10)
+	powers.position = Vector2(_vp.x - 46, _top + 47)
+	powers.size = Vector2(36, 36)
+	var g: Glass = powers.get_child(0)
+	g.tint_amount = 0.2
+	var laurel := UI.icon("laurel", 18, Art.hdr(UI.GOLD, 1.2))
+	laurel.position = Vector2(9, 9)
+	powers.add_child(laurel)
+	var badge := Control.new()
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.position = Vector2(24, -4)
+	badge.size = Vector2(16, 14)
+	badge.draw.connect(func(): badge.draw_circle(Vector2(8, 7), 7.5, UI.GOLD))
+	powers.add_child(badge)
+	_powers_badge = UI.label("", 8, Color(0.1, 0.05, 0.02), HORIZONTAL_ALIGNMENT_CENTER)
+	_powers_badge.add_theme_constant_override("outline_size", 0)
+	_powers_badge.add_theme_constant_override("shadow_offset_y", 0)
+	_powers_badge.size = Vector2(16, 14)
+	badge.add_child(_powers_badge)
+	badge.visible = false
+	powers.pressed.connect(func(): powers_pressed.emit())
+	_root.add_child(powers)
+
 	var coin_pill := UI.panel(UI.GOLD, 0.12, 999.0, 0.0)
 	coin_pill.position = Vector2(_vp.x - 136, _top + 5)
 	coin_pill.size = Vector2(84, 36)
@@ -105,7 +130,7 @@ func _ready() -> void:
 	_root.add_child(coin_pill)
 
 	_score = UI.label("0", 20, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
-	_score.position = Vector2(_vp.x - 180, _top + 44)
+	_score.position = Vector2(_vp.x - 226, _top + 50)
 	_score.size = Vector2(168, 24)
 	_root.add_child(_score)
 	_room = UI.label("", 8, Color(1, 1, 1, 0.75))
@@ -129,7 +154,10 @@ func _ready() -> void:
 	_root.add_child(_boss_panel)
 
 	_boons_panel = UI.panel(UI.GLASS_TINT, 0.08, 999.0, 0.0)
-	_boons_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boons_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_boons_panel.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed:
+			powers_pressed.emit())
 	_boons_panel.visible = false
 	_boons_draw = Control.new()
 	_boons_draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -145,7 +173,7 @@ func _ready() -> void:
 	_banner = UI.label("", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	_banner.modulate.a = 0.0
 	_root.add_child(_banner)
-	_hint = UI.label("Arraste para mover\nToque rápido ou deslize para DASH", 9, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER)
+	_hint = UI.label("Use o joystick para mover\nToque ou deslize fora dele para DASH", 9, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER)
 	_root.add_child(_hint)
 
 	_letterbox = Control.new()
@@ -246,6 +274,8 @@ func set_boons(picks: Dictionary) -> void:
 		if _picks.has(d["id"]):
 			n += 1
 	_boons_panel.visible = n > 0
+	_powers_badge.get_parent().visible = n > 0
+	_powers_badge.text = str(n)
 	var per_row := BOON_ROW
 	var rows := ceili(float(n) / per_row)
 	_boon_rows = rows
@@ -447,16 +477,20 @@ func _draw_boons() -> void:
 	var entries: Array = []
 	for b in GameData.BOONS:
 		if _picks.has(b["id"]):
-			entries.append([b["color"], String(b["god"]).left(1), int(_picks[b["id"]])])
+			entries.append([b["color"], b["id"], int(_picks[b["id"]]), ""])
 	for d in GameData.DUOS:
 		if _picks.has(d["id"]):
-			entries.append([GameData.DUO_COLOR, "D", 1])
+			entries.append([GameData.DUO_COLOR, d["gods"][0], 1, d["gods"][1]])
 	for e in entries:
 		var p := Vector2(13 + (i % BOON_ROW) * 20, 13 + (i / BOON_ROW) * 20)
 		var col: Color = e[0]
 		c.draw_circle(p, 8.5, Color(col.darkened(0.6), 0.75))
 		c.draw_arc(p, 8.5, 0, TAU, 24, col, 1.4, true)
-		c.draw_string(font, p + Vector2(-8, 3.5), e[1], HORIZONTAL_ALIGNMENT_CENTER, 16, 9, Color.WHITE)
+		if e[3] != "":
+			BoonArt.draw_emblem(c, e[1], p + Vector2(-2.5, -1.5), 12.0)
+			BoonArt.draw_emblem(c, e[3], p + Vector2(2.5, 2.0), 12.0)
+		elif not BoonArt.draw_emblem(c, e[1], p, 15.0):
+			c.draw_string(font, p + Vector2(-8, 3.5), String(GameData.GODS[e[1]]["name"]).left(1), HORIZONTAL_ALIGNMENT_CENTER, 16, 9, Color.WHITE)
 		if int(e[2]) > 1:
 			c.draw_circle(p + Vector2(6.5, 6.5), 3.8, col)
 			c.draw_string(ThemeDB.fallback_font, p + Vector2(4.6, 8.8), str(e[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color.BLACK)

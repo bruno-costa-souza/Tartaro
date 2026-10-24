@@ -36,9 +36,21 @@ static func build(on_close: Callable, title := "AJUSTES", extra: Array = []) -> 
 		Save.sound = on
 		Save.apply_settings()
 		Save.save_data()))
+	v.add_child(_toggle("Música", Save.music, func(on: bool):
+		Save.music = on
+		Save.apply_settings()
+		Save.save_data()))
 	v.add_child(_toggle("Efeitos leves", Save.low_fx, func(on: bool):
 		Save.low_fx = on
 		Save.save_data()))
+	var stick := UI.button("Posicionar joystick", UI.GLASS_TINT, 11)
+	stick.custom_minimum_size.y = 38
+	stick.pressed.connect(func():
+		var editor := ControlsEditor.new()
+		center.visible = false
+		editor.closed.connect(func(): center.visible = true)
+		root.add_child(editor))
+	v.add_child(stick)
 	if extra.is_empty():
 		var close := UI.button("Fechar", UI.GLASS_TINT, 12)
 		close.custom_minimum_size.y = 40

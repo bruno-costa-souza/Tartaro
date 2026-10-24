@@ -164,6 +164,7 @@ func _brute_move(to_player: Vector2, delta: float) -> Vector2:
 			if to_player.length() < 110.0:
 				_state = "windup"
 				_state_t = 0.55
+				main.sfx.play("growl", randf_range(1.15, 1.35))
 			return to_player.normalized() * speed
 		"windup":
 			if _state_t > 0.15:
@@ -171,6 +172,7 @@ func _brute_move(to_player: Vector2, delta: float) -> Vector2:
 			if _state_t <= 0.0:
 				_state = "charge"
 				_state_t = 0.35
+				main.sfx.play("charge", randf_range(1.15, 1.3), -3.0)
 			return Vector2.ZERO
 		"charge":
 			if _state_t <= 0.0:
@@ -191,6 +193,7 @@ func _archer_move(to_player: Vector2, delta: float) -> Vector2:
 	if _state == "aim":
 		if _state_t <= 0.0:
 			main.spawn_enemy_bullet(position + Vector2(0, -6), dir * 125.0, damage, Color("9be36d"))
+			main.sfx.play("enemy_shot", randf_range(0.95, 1.12))
 			_state = "chase"
 			_state_t = randf_range(1.8, 2.6)
 		return Vector2.ZERO
@@ -219,6 +222,7 @@ func _bomber_move(to_player: Vector2, delta: float) -> Vector2:
 	if to_player.length() < 26.0:
 		_state = "fuse"
 		_state_t = 0.55
+		main.sfx.play("fuse", randf_range(0.95, 1.1))
 	return to_player.normalized() * speed
 
 

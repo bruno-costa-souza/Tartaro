@@ -2,6 +2,7 @@ class_name CharSprite
 extends AnimatedSprite2D
 
 const ANIMS := ["move", "attack"]
+const DIRECTIONS := 8
 
 static var _cache := {}
 
@@ -26,7 +27,7 @@ static func _load(id: String) -> Dictionary:
 	for a in ANIMS:
 		var sheet: Texture2D = load("res://art/%s/%s.png" % [id, a])
 		var count := int(meta["frames"][a])
-		for d in HeroSprite.DIRECTIONS:
+		for d in DIRECTIONS:
 			var key := "%s_%d" % [a, d]
 			frames.add_animation(key)
 			frames.set_animation_speed(key, float(meta["fps"][a]))

@@ -10,6 +10,10 @@ boot_splash/bg_color=Color(0.055, 0.035, 0.07, 1)
 boot_splash/show_image=false
 config/features=PackedStringArray("4.7", "Mobile")
 
+[audio]
+
+general/ios/session_category=3
+
 [autoload]
 
 Save="*res://scripts/save.gd"

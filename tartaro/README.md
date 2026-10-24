@@ -47,3 +47,18 @@ jogo guarda o seu recorde daquele dia pra comparar com os amigos.
 ```bash
 godot --path .
 ```
+
+## Arte e áudio
+
+Os personagens, os retratos dos deuses e os emblemas das bênçãos são modelados e
+renderizados pelo Blender, e a trilha sonora e os efeitos são compostos por código.
+Para gerar tudo de novo, a partir desta pasta:
+
+```bash
+blender -b -P tools/blender/hero.py -- art/hero          # herói (16 direções, capa simulada)
+blender -b -P tools/blender/gods.py -- art/gods          # retratos dos deuses
+blender -b -P tools/blender/emblems.py -- art/emblems    # emblemas das bênçãos
+blender -b -P tools/blender/bestiary.py -- all art       # inimigos e chefes
+python3 tools/audio/compose.py                           # música e efeitos (precisa de numpy e soundfile)
+tools/make_voices.sh                                     # falas dos deuses
+```

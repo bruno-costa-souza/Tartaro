@@ -40,9 +40,10 @@ func _ready() -> void:
 	sparks.color_ramp = ramp
 	add_child(sparks)
 
-	if Sfx._cache.has("orb_hum"):
+	if Sfx.stream("orb_hum"):
 		_hum = AudioStreamPlayer2D.new()
-		_hum.stream = Sfx._cache["orb_hum"]
+		_hum.stream = Sfx.stream("orb_hum")
+		_hum.bus = "Sfx"
 		_hum.volume_db = -6.0
 		_hum.max_distance = 260.0
 		add_child(_hum)
@@ -79,5 +80,6 @@ func _draw() -> void:
 	draw_circle(bob, 11.0, Color(color.darkened(0.55), 0.85))
 	draw_arc(bob, 11.0, 0, TAU, 40, Art.hdr(color, 1.6), 1.6, true)
 	draw_circle(bob + Vector2(-3.5, -4.0), 2.6, Color(1, 1, 1, 0.35))
-	var emblem: String = GameData.GODS.get(god, GameData.GODS["olimpo"])["emblem"]
-	UI.draw_icon(self, emblem, bob, 6.5, Art.hdr(color.lightened(0.4), 1.4))
+	if not BoonArt.draw_emblem(self, god, bob, 19.0, Color(1.25, 1.25, 1.25)):
+		var emblem: String = GameData.GODS.get(god, GameData.GODS["olimpo"])["emblem"]
+		UI.draw_icon(self, emblem, bob, 6.5, Art.hdr(color.lightened(0.4), 1.4))

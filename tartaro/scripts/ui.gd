@@ -48,6 +48,7 @@ static func button(text: String, color: Color, font_size := 12, radius := 999.0)
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
 	b.add_theme_font_size_override("font_size", font_size)
 	for state in ["normal", "hover", "pressed", "disabled", "hover_pressed", "focus"]:
 		b.add_theme_stylebox_override(state, empty_box(14, 6))
@@ -59,6 +60,7 @@ static func button(text: String, color: Color, font_size := 12, radius := 999.0)
 	if font_size >= 18:
 		b.add_theme_font_override("font", title_font())
 	b.add_child(Glass.make(color, 0.28, radius))
+	b.pressed.connect(func(): Music.ui("tap"))
 	return b
 
 
@@ -87,6 +89,7 @@ static func wrap_label(text: String, font_size := 8, color := MUTED) -> Label:
 
 static func panel(tint := GLASS_TINT, amount := 0.1, radius := 18.0, margin := 12.0) -> PanelContainer:
 	var p := PanelContainer.new()
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	p.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	p.add_child(Glass.make(tint, amount, radius))
 	var m := MarginContainer.new()

@@ -1,18 +1,27 @@
 {
   "frame_size": 192,
-  "directions": 8,
+  "directions": 16,
   "frames": {
-    "idle": 8,
-    "walk": 8,
-    "attack": 6,
-    "dash": 4
+    "idle": 12,
+    "walk": 12,
+    "attack": 8,
+    "dash": 6
   },
   "fps": {
     "idle": 8,
-    "walk": 12,
-    "attack": 16,
-    "dash": 14
+    "walk": 18,
+    "attack": 22,
+    "dash": 18
   },
   "feet_y": 147.8,
-  "px_per_meter": 71.11
+  "figure_px": 108.1,
+  "px_per_meter": 71.11,
+  "showcase": {
+    "frame_size": 320,
+    "directions": 8,
+    "frames": 12,
+    "fps": 8,
+    "feet_y": 261.3,
+    "figure_px": 211.4
+  }
 }

@@ -14,6 +14,7 @@ const HERO_SCALE := 1.2
 const COLOR_BODY := Color("e8d9b0")
 const COLOR_CLOAK := Color("c0392b")
 const COLOR_DASH := Color("7fe7ff")
+const HERO_TINT := Color(1.05, 1.03, 1.02)
 
 var controls: TouchControls
 var main: Node
@@ -38,6 +39,9 @@ var _walk := 0.0
 var sprite: HeroSprite
 var _attack_anim := 0.0
 var _attack_dir := Vector2.DOWN
+var _base_scale := Vector2.ONE
+var _flash := 0.0
+var _step_frame := -1
 
 
 func _ready() -> void:
@@ -53,6 +57,7 @@ func _ready() -> void:
 		sprite = HeroSprite.new()
 		add_child(sprite)
 		sprite.fit_height(34.0)
+		_base_scale = sprite.scale
 
 
 func is_dashing() -> bool:
@@ -120,7 +125,8 @@ func _update_sprite(delta: float) -> void:
 	if sprite == null:
 		return
 	_attack_anim -= delta
-	var tint := Color.WHITE
+	_flash -= delta
+	var tint := HERO_TINT
 	if is_dead:
 		sprite.show_state("idle", facing)
 		sprite.rotation = PI * 0.5
@@ -137,8 +143,25 @@ func _update_sprite(delta: float) -> void:
 		sprite.show_state("idle", facing)
 	if _slow_t > 0.0:
 		tint = Color(0.65, 0.75, 0.65)
+	if _flash > 0.0:
+		tint = Color(2.6, 2.4, 2.4)
 	sprite.self_modulate = tint
-	sprite.visible = not (_invuln > 0.0 and int(_invuln * 20) % 2 == 0)
+	sprite.visible = _flash > 0.0 or not (_invuln > 0.0 and int(_invuln * 20) % 2 == 0)
+
+	var lean := 0.0
+	if is_dashing():
+		lean = clampf(_dash_dir.x, -1.0, 1.0) * 0.14
+	elif velocity.length() > 12.0:
+		lean = clampf(velocity.x / SPEED, -1.0, 1.0) * 0.07
+	sprite.rotation = lerpf(sprite.rotation, lean, minf(delta * 12.0, 1.0))
+	sprite.scale = sprite.scale.lerp(_base_scale, minf(delta * 14.0, 1.0))
+
+	if sprite.anim == "walk" and sprite.frame != _step_frame:
+		_step_frame = sprite.frame
+		if _step_frame == 3 or _step_frame == 9:
+			main.on_footstep(position + Vector2(-2.0 if _step_frame == 3 else 2.0, 0))
+	elif sprite.anim != "walk":
+		_step_frame = -1
 
 
 func _try_dash(dir: Vector2) -> void:
@@ -153,6 +176,8 @@ func _try_dash(dir: Vector2) -> void:
 	_dash_gap = DASH_TIME + 0.08
 	_slow_t = 0.0
 	_trail_timer = 0.0
+	if sprite:
+		sprite.scale = _base_scale * Vector2(0.84, 1.14)
 	main.on_player_dash()
 
 
@@ -195,6 +220,9 @@ func take_damage(amount: int, from_pos: Vector2) -> void:
 		return
 	hp = max(hp - amount, 0)
 	_invuln = INVULN_AFTER_HIT
+	_flash = 0.1
+	if sprite:
+		sprite.scale = _base_scale * Vector2(1.12, 0.9)
 	_knock = (position - from_pos).normalized() * 180
 	hp_changed.emit(hp, max_hp)
 	main.on_player_hurt()
@@ -204,6 +232,7 @@ func take_damage(amount: int, from_pos: Vector2) -> void:
 			sprite.show_state("idle", facing)
 			sprite.pause()
 			sprite.rotation = PI * 0.5
+			sprite.scale = _base_scale
 			sprite.position = Vector2(-8, -2)
 			sprite.self_modulate = Color(0.6, 0.5, 0.5)
 			sprite.visible = true

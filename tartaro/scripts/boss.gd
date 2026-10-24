@@ -141,6 +141,9 @@ func _update_step(delta: float) -> Vector2:
 				for a in arms:
 					_bullet(position + Vector2(0, -10), Vector2.from_angle(_spin_a + TAU * a / arms) * float(s["speed"]))
 				_spin_a += float(s["spin"]) * float(s["gap"])
+				_sc += 1
+				if _sc % 3 == 1:
+					main.sfx.play("enemy_shot", randf_range(0.8, 0.95), -4.0)
 		"charge":
 			return _charge_step(s, to_player)
 		"beam":
@@ -158,6 +161,7 @@ func _update_step(delta: float) -> Vector2:
 				var off := Vector2.from_angle(TAU * i / int(s["count"])) * 30.0
 				main.spawn_minion(s["kind"], position + off)
 			main.camera.add_trauma(0.3)
+			main.sfx.play("summon")
 			_next_step()
 		"teleport":
 			_teleport_step()
@@ -170,12 +174,14 @@ func _charge_step(s: Dictionary, to_player: Vector2) -> Vector2:
 			_sstate = "windup"
 			_sub = 0.6
 			_aim = to_player.normalized()
+			main.sfx.play("growl", 0.75)
 		"windup":
 			if _sub > 0.2:
 				_aim = to_player.normalized()
 			if _sub <= 0.0:
 				_sstate = "go"
 				_sub = 0.55
+				main.sfx.play("charge", 0.85)
 		"go":
 			if _sub <= 0.0:
 				_end_charge(s)
@@ -189,6 +195,7 @@ func _charge_step(s: Dictionary, to_player: Vector2) -> Vector2:
 
 func _on_charge_wall(normal: Vector2) -> void:
 	main.camera.add_trauma(0.35)
+	main.sfx.play("wall_slam", randf_range(0.9, 1.05))
 	if _step.get("bounce", false) and _bounces < 2:
 		_bounces += 1
 		_aim = _aim.bounce(normal)
@@ -214,6 +221,7 @@ func _beam_step(s: Dictionary, to_player: Vector2) -> void:
 			_sub = 0.9
 			_beam_hit = false
 			_aim = to_player.normalized()
+			main.sfx.play("beam_charge")
 		"aim":
 			if _sub > 0.25:
 				_aim = (target.position + Vector2(0, -5) - _eye()).normalized()
@@ -221,7 +229,7 @@ func _beam_step(s: Dictionary, to_player: Vector2) -> void:
 				_sstate = "fire"
 				_sub = 0.35
 				main.camera.add_trauma(0.3)
-				main.sfx.play("zap", 0.6)
+				main.sfx.play("beam_fire")
 		"fire":
 			if not _beam_hit and target.can_be_hit():
 				var p := target.position + Vector2(0, -5)
@@ -242,6 +250,7 @@ func _teleport_step() -> void:
 	match _sstate:
 		"start":
 			_sstate = "out"
+			main.sfx.play("teleport")
 		"out":
 			_alpha -= 0.06
 			if _alpha <= 0.0:
@@ -282,7 +291,7 @@ func _fire_spread(count: int, spread: float, spd: float, heads: bool) -> void:
 			if count > 1:
 				a += lerpf(-spread / 2.0, spread / 2.0, float(i) / (count - 1))
 			_bullet(from, Vector2.from_angle(a) * spd)
-	main.sfx.play("shoot", 0.6)
+	main.sfx.play("boss_shot", randf_range(0.92, 1.05))
 
 
 func _fire_ring(count: int, offset: float, gap_size: int, spd: float) -> void:
@@ -293,7 +302,7 @@ func _fire_ring(count: int, offset: float, gap_size: int, spd: float) -> void:
 			if mini(d, count - d) <= gap_size / 2:
 				continue
 		_bullet(position + Vector2(0, -8), Vector2.from_angle(offset + TAU * i / count) * spd)
-	main.sfx.play("hit", 0.5)
+	main.sfx.play("boss_ring", randf_range(0.95, 1.05))
 
 
 func _bullet(from: Vector2, vel: Vector2) -> void:

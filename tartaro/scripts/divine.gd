@@ -62,6 +62,7 @@ func _ready() -> void:
 	_voice.volume_db = -2.0
 	add_child(_voice)
 	_sting = AudioStreamPlayer.new()
+	_sting.bus = "Sfx"
 	_sting.volume_db = -3.0
 	add_child(_sting)
 

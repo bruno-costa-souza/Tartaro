@@ -1,8 +1,12 @@
 extends Control
 
+## Main menu: home (hero, journey and play), arsenal (weapon showcase and
+## grid) and eternal blessings (permanent upgrades), with a bottom tab bar
+## whose selected tab grows, mobile-game style.
+
 const TABS := [
-	{"id": "play", "name": "Jogar", "icon": "flame"},
 	{"id": "arsenal", "name": "Arsenal", "icon": "sword"},
+	{"id": "play", "name": "Jogar", "icon": "flame"},
 	{"id": "perma", "name": "Bênçãos", "icon": "laurel"},
 ]
 
@@ -16,18 +20,34 @@ const TIPS := [
 	"Escolha a porta pela recompensa: bênção, óbolos, cura, vida ou Bigorna.",
 	"Atraia inimigos para as poças: elas ferem eles também.",
 	"O olhar da Medusa deixa você lento. Saia da linha vermelha!",
+	"Toque no laurel durante a run para ver todos os seus poderes.",
 ]
 
+const WEAPON_EMBLEM := {"lanca": "lanca", "arco": "artemis", "espada": "ares", "cetro": "cetro"}
+const PERMA_EMBLEM := {"vida": "vida", "forca": "forca", "fortuna": "tique"}
+const PERMA_COLOR := {"vida": Color("ff5a6e"), "forca": Color("ff8c3a"), "fortuna": Color("ffd84a")}
+const REGIONS := [
+	{"name": "Tártaro", "boss": "Cérbero", "color": Color("b06cff"), "god": "hecate"},
+	{"name": "Asfódelo", "boss": "Medusa", "color": Color("8be05a"), "god": "demeter"},
+	{"name": "Elísio", "boss": "Talos", "color": Color("ffcf6a"), "god": "apolo"},
+]
+const NAV_H := 66.0
+
 var _page := "play"
-var _list: VBoxContainer
+var _vp := Vector2(360, 640)
+var _top := 8.0
+var _bottom := 8.0
 var _scroll: ScrollContainer
+var _list: VBoxContainer
 var _coins: Label
 var _countdown: Label
 var _tab_buttons: Array[Button] = []
-var _tab_pill: Glass
+var _tab_glow: Glass
 var _settings: Control
 var _sfx: Sfx
-var _vp := Vector2(360, 640)
+var _stage: HeroStage
+var _brand: Control
+var _weapon_pick := ""
 
 
 func _ready() -> void:
@@ -35,14 +55,17 @@ func _ready() -> void:
 	Engine.time_scale = 1.0
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_vp = get_viewport_rect().size
+	_top = UI.safe_top(_vp.x)
+	_bottom = UI.safe_bottom(_vp.x)
+	_weapon_pick = Save.equipped
 	_sfx = Sfx.new()
 	add_child(_sfx)
 	_build_backdrop()
 	_build_stage()
-	_build_top_bar()
 	_build_content_area()
+	_build_top_bar()
 	_build_tab_bar()
-	_show_page("play")
+	_show_page("play", false)
 	Music.play("menu")
 
 
@@ -52,6 +75,8 @@ func _process(_delta: float) -> void:
 		var left := 86400 - (int(now["hour"]) * 3600 + int(now["minute"]) * 60 + int(now["second"]))
 		_countdown.text = "Nova escalada em %02d:%02d:%02d" % [left / 3600, (left / 60) % 60, left % 60]
 
+
+# ---------------------------------------------------------------- frame
 
 func _build_backdrop() -> void:
 	var env := Environment.new()
@@ -96,44 +121,46 @@ func _build_backdrop() -> void:
 
 
 func _stage_h() -> float:
-	return clampf(_vp.y * 0.37, 220.0, 300.0)
+	return clampf(_vp.y * 0.36, 210.0, 300.0)
 
 
 func _build_stage() -> void:
-	var top := UI.safe_top(_vp.x)
+	_brand = Control.new()
+	_brand.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_brand.position = Vector2(0, _top + 28)
+	_brand.size = Vector2(_vp.x, 60)
 	var title := UI.label("TÁRTARO", 38, Art.hdr(UI.GOLD, 1.25), HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_constant_override("outline_size", 0)
-	title.position = Vector2(0, top + 30)
 	title.size = Vector2(_vp.x, 44)
-	add_child(title)
+	_brand.add_child(title)
 	var sub := UI.label("FUGA DO SUBMUNDO", 9, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	sub.position = Vector2(0, top + 74)
+	sub.position = Vector2(0, 44)
 	sub.size = Vector2(_vp.x, 14)
-	add_child(sub)
+	_brand.add_child(sub)
+	add_child(_brand)
 
-	var stage := HeroStage.new()
-	stage.position = Vector2(_vp.x / 2, _stage_h() + top - 6)
-	add_child(stage)
+	_stage = HeroStage.new()
+	_stage.position = Vector2(_vp.x / 2, _stage_h() + _top - 6)
+	add_child(_stage)
 
 
 func _build_top_bar() -> void:
-	var top := UI.safe_top(_vp.x)
 	var gear := UI.button("", UI.GLASS_TINT, 10)
-	gear.position = Vector2(14, top)
+	gear.position = Vector2(14, _top)
 	gear.size = Vector2(36, 36)
 	gear.add_child(_centered_icon("gear", 16, Color(1, 1, 1, 0.9)))
 	gear.pressed.connect(_open_settings)
 	add_child(gear)
 
 	var pill := UI.panel(UI.GOLD, 0.12, 999.0, 0.0)
-	pill.position = Vector2(_vp.x - 110, top)
+	pill.position = Vector2(_vp.x - 110, _top)
 	pill.custom_minimum_size = Vector2(96, 36)
 	pill.size = Vector2(96, 36)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 6)
 	row.add_child(UI.icon("coin", 16, UI.GOLD))
-	_coins = UI.label(str(Save.coins), 14, UI.GOLD)
+	_coins = UI.label("", 14, UI.GOLD)
 	row.add_child(_coins)
 	UI.body(pill).alignment = BoxContainer.ALIGNMENT_CENTER
 	UI.body(pill).add_child(row)
@@ -148,68 +175,117 @@ func _centered_icon(kind: String, px: float, color: Color) -> Control:
 
 
 func _build_content_area() -> void:
-	var top := UI.safe_top(_vp.x) + _stage_h() + 8
-	var bottom := UI.safe_bottom(_vp.x) + 74
 	_scroll = ScrollContainer.new()
-	_scroll.position = Vector2(0, top)
-	_scroll.size = Vector2(_vp.x, _vp.y - top - bottom)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	add_child(_scroll)
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_theme_constant_override("margin_left", 16)
 	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_bottom", 14)
 	_scroll.add_child(margin)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 10)
 	margin.add_child(_list)
 
 
+func _layout_content() -> void:
+	var top := _top + (_stage_h() + 2.0 if _page == "play" else 48.0)
+	var bottom := _bottom + NAV_H + 12.0
+	_scroll.position = Vector2(0, top)
+	_scroll.size = Vector2(_vp.x, _vp.y - top - bottom)
+
+
 func _build_tab_bar() -> void:
-	var h := 58.0
-	var bar := UI.panel(UI.GLASS_TINT, 0.08, 999.0, 0.0)
-	bar.position = Vector2(16, _vp.y - UI.safe_bottom(_vp.x) - h - 6)
-	bar.size = Vector2(_vp.x - 32, h)
+	var bar := UI.panel(Color(0.1, 0.07, 0.16), 0.55, 26.0, 0.0)
+	bar.position = Vector2(10, _vp.y - _bottom - NAV_H - 4)
+	bar.size = Vector2(_vp.x - 20, NAV_H)
 	add_child(bar)
-	_tab_pill = Glass.make(UI.GOLD, 0.22, 999.0)
-	_tab_pill.fill_parent = false
-	_tab_pill.show_behind_parent = false
-	var w := (_vp.x - 32 - 12) / TABS.size()
-	add_child(_tab_pill)
-	_tab_pill.position = bar.position + Vector2(6, 6)
-	_tab_pill.size = Vector2(w, h - 12)
+	_tab_glow = Glass.make(UI.GOLD, 0.3, 20.0)
+	_tab_glow.fill_parent = false
+	_tab_glow.show_behind_parent = false
+	add_child(_tab_glow)
 	for i in TABS.size():
 		var tab: Dictionary = TABS[i]
 		var b := Button.new()
 		b.flat = true
 		b.focus_mode = Control.FOCUS_NONE
-		b.position = bar.position + Vector2(6 + i * w, 6)
-		b.size = Vector2(w, h - 12)
+		for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 		var v := VBoxContainer.new()
 		v.set_anchors_preset(Control.PRESET_FULL_RECT)
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_theme_constant_override("separation", 1)
-		var ic := UI.icon(tab["icon"], 18, Color.WHITE)
+		v.add_theme_constant_override("separation", 2)
+		var ic := UI.icon(tab["icon"], 22, Color.WHITE)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(ic)
-		v.add_child(UI.label(tab["name"], 9, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER))
+		var name_label := UI.label(String(tab["name"]).to_upper(), 9, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+		name_label.add_theme_font_override("font", _spaced(UI.title_font(), 1))
+		v.add_child(name_label)
 		b.add_child(v)
+		b.set_meta("label", name_label)
+		b.set_meta("icon", ic)
 		b.pressed.connect(_show_page.bind(tab["id"]))
 		add_child(b)
 		_tab_buttons.append(b)
 
 
-func _show_page(id: String) -> void:
-	if id != _page:
-		_sfx.play("xp", 1.3)
-	_page = id
+func _tab_rects(selected: int) -> Array:
+	var x := 16.0
+	var w := _vp.x - 32.0
+	var big := w * 0.42
+	var small := (w - big) / (TABS.size() - 1)
+	var y := _vp.y - _bottom - NAV_H + 2.0
+	var out: Array = []
 	for i in TABS.size():
-		var selected: bool = TABS[i]["id"] == id
-		_tab_buttons[i].modulate = Color.WHITE if selected else Color(1, 1, 1, 0.55)
-		if selected:
-			_tab_pill.create_tween().tween_property(_tab_pill, "position:x", _tab_buttons[i].position.x, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		var tw := big if i == selected else small
+		out.append(Rect2(Vector2(x, y), Vector2(tw, NAV_H - 12.0)))
+		x += tw
+	return out
+
+
+func _show_page(id: String, animate := true) -> void:
+	if id != _page and animate:
+		Music.ui("select")
+	_page = id
+	var sel := 0
+	for i in TABS.size():
+		if TABS[i]["id"] == id:
+			sel = i
+	var rects := _tab_rects(sel)
+	for i in TABS.size():
+		var b := _tab_buttons[i]
+		var r: Rect2 = rects[i]
+		var label: Label = b.get_meta("label")
+		var on := i == sel
+		if animate:
+			var t := b.create_tween().set_parallel(true)
+			t.tween_property(b, "position", r.position, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.tween_property(b, "size", r.size, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.tween_property(b, "modulate", Color.WHITE if on else Color(1, 1, 1, 0.55), 0.18)
+		else:
+			b.position = r.position
+			b.size = r.size
+			b.modulate = Color.WHITE if on else Color(1, 1, 1, 0.55)
+		label.visible = on
+		(b.get_meta("icon") as Control).scale = Vector2.ONE * (1.15 if on else 1.0)
+	var target: Rect2 = rects[sel]
+	if animate:
+		var gt := _tab_glow.create_tween().set_parallel(true)
+		gt.tween_property(_tab_glow, "position", target.position, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		gt.tween_property(_tab_glow, "size", target.size, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		_tab_glow.position = target.position
+		_tab_glow.size = target.size
+	var home := id == "play"
+	for n: CanvasItem in [_stage, _brand]:
+		if animate:
+			n.create_tween().tween_property(n, "modulate:a", 1.0 if home else 0.0, 0.2)
+		else:
+			n.modulate.a = 1.0 if home else 0.0
+	_layout_content()
 	_rebuild()
 
 
@@ -229,211 +305,367 @@ func _rebuild() -> void:
 	_scroll.scroll_vertical = 0
 
 
+func _spaced(base: Font, spacing: int) -> FontVariation:
+	var f := FontVariation.new()
+	f.base_font = base
+	f.spacing_glyph = spacing
+	return f
+
+
+func _header(title: String, sub: String) -> Control:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 1)
+	var t := UI.label(title, 24, Color("f0e2c0"))
+	t.add_theme_font_override("font", _spaced(UI.title_font(), 2))
+	v.add_child(t)
+	v.add_child(UI.wrap_label(sub, 10, Color(1, 1, 1, 0.62)))
+	return v
+
+
+# ---------------------------------------------------------------- home
+
 func _page_play() -> void:
+	_list.add_child(_journey())
+
 	var seed_value := Save.daily_seed()
-	var daily := UI.panel(Color("b06cff"), 0.14)
+	var daily := UI.panel(Color("b06cff"), 0.14, 18.0, 12.0)
 	var v := UI.body(daily)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 6)
 	head.add_child(UI.icon("flame", 14, Color("ff9a4a")))
 	var t := UI.label("DESAFIO DIÁRIO", 11, Color("e2c4ff"))
+	t.add_theme_font_override("font", _spaced(UI.title_font(), 1))
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(t)
 	var best := Save.best_score(seed_value)
-	head.add_child(UI.label("Recorde  %s" % (str(best) if best > 0 else "--"), 10, UI.GOLD))
+	head.add_child(UI.label("Recorde  %s" % (str(best) if best > 0 else "--"), 11, UI.GOLD))
 	v.add_child(head)
-	v.add_child(UI.wrap_label("Hoje todos enfrentam a mesma escalada. Supere seus amigos.", 9))
-	_countdown = UI.label("", 8, Color(1, 1, 1, 0.55))
+	v.add_child(UI.wrap_label("Hoje todos enfrentam a mesma escalada. Supere seus amigos.", 10, Color(1, 1, 1, 0.78)))
+	_countdown = UI.label("", 9, Color(1, 1, 1, 0.55))
 	v.add_child(_countdown)
 	_list.add_child(daily)
 
-	var play := UI.button("JOGAR", UI.EMBER, 26)
-	play.custom_minimum_size.y = 60
+	var play := UI.button("JOGAR", UI.EMBER, 28)
+	play.custom_minimum_size.y = 62
 	play.pressed.connect(_start.bind(0))
 	_list.add_child(play)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
-	var train := UI.button("Treino", UI.GLASS_TINT, 11)
-	train.custom_minimum_size.y = 38
+	var train := UI.button("Treino", UI.GLASS_TINT, 12)
+	train.custom_minimum_size.y = 42
 	train.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	train.pressed.connect(func(): _start(randi_range(1, 999999)))
 	row.add_child(train)
 	var w: Dictionary = GameData.WEAPONS[Save.equipped]
-	var arm := UI.button(w["name"], w["color"], 10)
-	arm.custom_minimum_size.y = 38
+	var arm := UI.button("   " + String(w["name"]), w["color"], 11)
+	arm.custom_minimum_size.y = 42
 	arm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var mini := Medallion.new()
+	mini.emblem = WEAPON_EMBLEM.get(Save.equipped, "lanca")
+	mini.color = w["color"]
+	mini.custom_minimum_size = Vector2(30, 30)
+	mini.position = Vector2(8, 6)
+	mini.size = Vector2(30, 30)
+	arm.add_child(mini)
 	arm.pressed.connect(_show_page.bind("arsenal"))
 	row.add_child(arm)
 	_list.add_child(row)
 
-	var stats := UI.panel()
+	var stats := UI.panel(UI.GLASS_TINT, 0.08, 18.0, 10.0)
 	var grid := HBoxContainer.new()
-	grid.add_theme_constant_override("separation", 0)
 	for s in [["RUNS", Save.stats["runs"]], ["SALA MÁX", Save.stats["best_room"]], ["CHEFES", Save.stats["bosses"]], ["ABATES", Save.stats["kills"]]]:
 		var cell := VBoxContainer.new()
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cell.add_theme_constant_override("separation", 0)
 		cell.add_child(UI.label(str(int(s[1])), 20, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER))
-		cell.add_child(UI.label(s[0], 7, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		cell.add_child(UI.label(s[0], 8, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 		grid.add_child(cell)
 	UI.body(stats).add_child(grid)
 	_list.add_child(stats)
 
-	var tip := UI.panel(Color("4aa3ff"), 0.08)
+	var tip := UI.panel(Color("4aa3ff"), 0.08, 18.0, 10.0)
 	var trow := HBoxContainer.new()
 	trow.add_theme_constant_override("separation", 8)
 	trow.add_child(UI.icon("laurel", 18, Color("9ccfff")))
-	trow.add_child(UI.wrap_label(TIPS[randi() % TIPS.size()], 9, Color(1, 1, 1, 0.85)))
+	trow.add_child(UI.wrap_label(TIPS[randi() % TIPS.size()], 10, Color(1, 1, 1, 0.85)))
 	UI.body(tip).add_child(trow)
 	_list.add_child(tip)
 
 
+func _journey() -> Control:
+	var card := UI.panel(Color(0.5, 0.42, 0.7), 0.1, 18.0, 10.0)
+	var best := int(Save.stats["best_room"])
+	var road := Control.new()
+	road.custom_minimum_size = Vector2(0, 74)
+	road.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	road.draw.connect(func():
+		var w := road.size.x
+		var y := 26.0
+		var xs := [w * 0.16, w * 0.5, w * 0.84]
+		for i in 2:
+			var reached := best > (i + 1) * GameData.ROOMS_PER_BIOME
+			var a := Vector2(xs[i] + 24, y)
+			var b := Vector2(xs[i + 1] - 24, y)
+			var k := 0
+			var steps := 9
+			while k < steps:
+				var p0 := a.lerp(b, float(k) / steps)
+				var p1 := a.lerp(b, float(k + 0.55) / steps)
+				road.draw_line(p0, p1, Color(UI.GOLD, 0.8) if reached else Color(1, 1, 1, 0.18), 2.0, true)
+				k += 1
+		for i in 3:
+			var reg: Dictionary = REGIONS[i]
+			var c := Vector2(xs[i], y)
+			var unlocked := best > i * GameData.ROOMS_PER_BIOME or i == 0
+			var col: Color = reg["color"]
+			if unlocked:
+				Art.glow(road, c, 34.0, col, 0.35)
+			road.draw_circle(c, 21.0, Color(0.03, 0.02, 0.05, 0.95))
+			road.draw_arc(c, 21.0, 0, TAU, 40, Art.hdr(UI.GOLD, 1.2) if unlocked else Color(1, 1, 1, 0.25), 2.0, true)
+			if not BoonArt.draw_emblem(road, reg["god"], c, 30.0, Color.WHITE if unlocked else Color(0.35, 0.35, 0.4)):
+				road.draw_circle(c, 8.0, col)
+			var name_col := col.lightened(0.3) if unlocked else Color(1, 1, 1, 0.35)
+			var f := UI.title_font()
+			road.draw_string(f, Vector2(c.x - 50, y + 36), String(reg["name"]).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 100, 10, name_col)
+			var boss_done := best > (i + 1) * GameData.ROOMS_PER_BIOME - 1
+			road.draw_string(ThemeDB.fallback_font, Vector2(c.x - 50, y + 48), ("✓ " if boss_done else "") + String(reg["boss"]), HORIZONTAL_ALIGNMENT_CENTER, 100, 8,
+				Color(UI.GOLD, 0.85) if boss_done else Color(1, 1, 1, 0.4)))
+	UI.body(card).add_child(road)
+	var foot := UI.label("Sua melhor escalada: sala %d" % best if best > 0 else "Sua primeira escalada te espera.", 9, Color(1, 1, 1, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
+	UI.body(card).add_child(foot)
+	return card
+
+
+# ---------------------------------------------------------------- arsenal
+
 func _page_arsenal() -> void:
-	_list.add_child(_section("ARSENAL", "Armas compradas são suas para sempre."))
+	_list.add_child(_header("ARSENAL", "Armas compradas são suas para sempre."))
+	_list.add_child(_weapon_showcase(_weapon_pick))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
 	for id in GameData.WEAPON_ORDER:
-		_list.add_child(_weapon_card(id))
+		grid.add_child(_weapon_tile(id))
+	_list.add_child(grid)
 
 
-func _page_perma() -> void:
-	_list.add_child(_section("BÊNÇÃOS ETERNAS", "Melhorias permanentes para todas as runs."))
-	for id in GameData.PERMA_ORDER:
-		_list.add_child(_perma_card(id))
-
-
-func _section(title: String, sub: String) -> Control:
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 0)
-	v.add_child(UI.label(title, 20, Color("f0e2c0")))
-	v.add_child(UI.wrap_label(sub, 9))
-	return v
-
-
-func _emblem(kind: String, color: Color) -> Control:
-	var holder := Control.new()
-	holder.custom_minimum_size = Vector2(48, 48)
-	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var g := Glass.make(color, 0.3, 999.0)
-	holder.add_child(g)
-	var ic := UI.icon(kind, 26, color.lightened(0.35))
-	ic.position = Vector2(11, 11)
-	holder.add_child(ic)
-	return holder
-
-
-func _stat_bar(name: String, ratio: float, color: Color) -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	var l := UI.label(name, 7, UI.MUTED)
-	l.custom_minimum_size.x = 46
-	row.add_child(l)
-	var bar := Control.new()
-	bar.custom_minimum_size = Vector2(0, 8)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.draw.connect(func():
-		var r := Rect2(Vector2(0, 2), Vector2(bar.size.x, 4))
-		bar.draw_rect(r, Color(1, 1, 1, 0.12))
-		bar.draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(ratio, 0.05, 1.0), 4)), color))
-	row.add_child(bar)
-	return row
-
-
-func _weapon_card(id: String) -> Control:
+func _weapon_showcase(id: String) -> Control:
 	var w: Dictionary = GameData.WEAPONS[id]
 	var color: Color = w["color"]
 	var owned: bool = id in Save.owned_weapons
 	var equipped := Save.equipped == id
-	var card := UI.panel(color, 0.16 if equipped else 0.07)
+	var card := UI.panel(color, 0.14, 22.0, 14.0)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.add_child(_emblem(UI.weapon_icon(id), color))
+	row.add_theme_constant_override("separation", 12)
+	var med := Medallion.new()
+	med.emblem = WEAPON_EMBLEM.get(id, "lanca")
+	med.color = color
+	med.rays = true
+	med.custom_minimum_size = Vector2(108, 108)
+	med.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(med)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 2)
-	info.add_child(UI.label(w["name"], 12, color.lightened(0.25)))
-	info.add_child(UI.wrap_label(w["desc"], 8))
+	info.add_theme_constant_override("separation", 3)
+	var name_label := UI.label(w["name"], 17, color.lightened(0.3))
+	name_label.add_theme_font_override("font", UI.title_font())
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(name_label)
+	info.add_child(UI.wrap_label(w["desc"], 10, Color(1, 1, 1, 0.82)))
 	var dps := float(w["damage"]) / float(w["interval"])
 	info.add_child(_stat_bar("DANO", dps / 7.0, color))
 	info.add_child(_stat_bar("ALCANCE", float(w["range"]) / 240.0, color))
+	info.add_child(_stat_bar("CADÊNCIA", (1.0 / float(w["interval"])) / 3.2, color))
 	row.add_child(info)
 	UI.body(card).add_child(row)
 
 	var btn: Button
 	if equipped:
-		btn = UI.button("Equipada", Color("27ae60"), 10)
+		btn = UI.button("✓  Equipada", Color("27ae60"), 13)
 		btn.disabled = true
 	elif owned:
-		btn = UI.button("Equipar", Color("4aa3ff"), 10)
+		btn = UI.button("Equipar", Color("4aa3ff"), 14)
 		btn.pressed.connect(func():
 			Save.equip(id)
-			_sfx.play("coin")
+			_sfx.play("select")
 			_rebuild())
 	else:
-		btn = UI.button("Comprar  -  %d" % int(w["cost"]), UI.GOLD, 10)
-		btn.disabled = Save.coins < int(w["cost"])
+		var cost := int(w["cost"])
+		btn = UI.button("Comprar   ◎ %d" % cost, UI.GOLD, 14)
+		btn.disabled = not Save.can_afford(cost)
 		btn.pressed.connect(func():
 			if Save.buy_weapon(id):
 				_sfx.play("buy")
 				_rebuild())
-	btn.custom_minimum_size.y = 34
+	btn.custom_minimum_size.y = 44
 	UI.body(card).add_child(btn)
 	return card
+
+
+func _weapon_tile(id: String) -> Control:
+	var w: Dictionary = GameData.WEAPONS[id]
+	var color: Color = w["color"]
+	var owned: bool = id in Save.owned_weapons
+	var equipped := Save.equipped == id
+	var selected := id == _weapon_pick
+	var b := UI.button("", color if selected else UI.GLASS_TINT, 10, 18.0)
+	b.custom_minimum_size = Vector2(0, 96)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var g: Glass = b.get_child(0)
+	g.tint_amount = 0.32 if selected else 0.12
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", 2)
+	var med := Medallion.new()
+	med.emblem = WEAPON_EMBLEM.get(id, "lanca")
+	med.color = color
+	med.dim = not owned
+	med.custom_minimum_size = Vector2(52, 52)
+	med.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(med)
+	v.add_child(UI.label(String(w["name"]), 10, color.lightened(0.35) if owned else Color(1, 1, 1, 0.6), HORIZONTAL_ALIGNMENT_CENTER))
+	var status := "✓ Equipada" if equipped else ("Sua" if owned else "◎ %d" % int(w["cost"]))
+	v.add_child(UI.label(status, 9, Color("6fe39a") if equipped else (UI.MUTED if owned else UI.GOLD), HORIZONTAL_ALIGNMENT_CENTER))
+	b.add_child(v)
+	b.pressed.connect(func():
+		_weapon_pick = id
+		_rebuild())
+	return b
+
+
+func _stat_bar(label_text: String, ratio: float, color: Color) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var l := UI.label(label_text, 8, UI.MUTED)
+	l.custom_minimum_size.x = 58
+	row.add_child(l)
+	var bar := Control.new()
+	bar.custom_minimum_size = Vector2(0, 10)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.draw.connect(func():
+		var segs := 10
+		var gap := 2.0
+		var sw := (bar.size.x - gap * (segs - 1)) / segs
+		var lit := clampf(ratio, 0.05, 1.0) * segs
+		for i in segs:
+			var r := Rect2(Vector2(i * (sw + gap), 2), Vector2(sw, 6))
+			bar.draw_rect(r, Art.hdr(color, 1.15) if i < lit else Color(1, 1, 1, 0.1)))
+	row.add_child(bar)
+	return row
+
+
+# ---------------------------------------------------------------- eternal blessings
+
+func _page_perma() -> void:
+	_list.add_child(_header("BÊNÇÃOS ETERNAS", "Melhorias permanentes, valem para todas as runs."))
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override("separation", 6)
+	for id in GameData.PERMA_ORDER:
+		chips.add_child(_bonus_chip(id))
+	_list.add_child(chips)
+	for id in GameData.PERMA_ORDER:
+		_list.add_child(_perma_card(id))
+
+
+func _perma_total(id: String, lvl: int) -> String:
+	match id:
+		"vida":
+			return "+%d de vida" % (10 * lvl)
+		"forca":
+			return "+%d%% de dano" % (10 * lvl)
+		"fortuna":
+			return "+%d%% de óbolos" % (25 * lvl)
+	return ""
+
+
+func _bonus_chip(id: String) -> Control:
+	var color: Color = PERMA_COLOR[id]
+	var p := UI.panel(color, 0.14, 999.0, 6.0)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var l := UI.label(_perma_total(id, Save.perma_level(id)), 9, color.lightened(0.35), HORIZONTAL_ALIGNMENT_CENTER)
+	UI.body(p).add_child(l)
+	return p
 
 
 func _perma_card(id: String) -> Control:
 	var u: Dictionary = GameData.PERMA[id]
 	var lvl := Save.perma_level(id)
 	var max_lvl := int(u["max"])
-	var color: Color = {"vida": Color("ff5e6c"), "forca": Color("ff9a4a"), "fortuna": UI.GOLD}[id]
-	var icon_kind: String = {"vida": "heart", "forca": "fist", "fortuna": "coin"}[id]
-	var card := UI.panel(color, 0.08)
+	var color: Color = PERMA_COLOR[id]
+	var card := UI.panel(color, 0.12, 22.0, 12.0)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.add_child(_emblem(icon_kind, color))
+	row.add_theme_constant_override("separation", 12)
+	var med := Medallion.new()
+	med.emblem = PERMA_EMBLEM[id]
+	med.color = color
+	med.custom_minimum_size = Vector2(72, 72)
+	med.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(med)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 3)
 	var head := HBoxContainer.new()
-	var n := UI.label(u["name"], 12, color.lightened(0.3))
+	var n := UI.label(String(u["name"]).to_upper(), 15, color.lightened(0.3))
+	n.add_theme_font_override("font", _spaced(UI.title_font(), 1))
 	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(n)
-	head.add_child(UI.label("%d/%d" % [lvl, max_lvl], 10, UI.MUTED))
+	head.add_child(UI.label("NV %d/%d" % [lvl, max_lvl], 10, UI.GOLD if lvl >= max_lvl else UI.MUTED))
 	info.add_child(head)
-	info.add_child(UI.wrap_label(u["desc"], 8))
+	var effect := RichTextLabel.new()
+	effect.bbcode_enabled = true
+	effect.fit_content = true
+	effect.scroll_active = false
+	effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	effect.add_theme_font_size_override("normal_font_size", 10)
+	effect.add_theme_color_override("default_color", Color(1, 1, 1, 0.8))
+	var hex := color.lightened(0.35).to_html(false)
+	if lvl >= max_lvl:
+		effect.text = "Atual: [color=#%s]%s[/color]  •  no máximo" % [hex, _perma_total(id, lvl)]
+	else:
+		effect.text = "Atual: [color=#%s]%s[/color]\nPróximo: [color=#%s]%s[/color]" % [hex, _perma_total(id, lvl) if lvl > 0 else "nada", UI.GOLD.to_html(false), _perma_total(id, lvl + 1)]
+	info.add_child(effect)
 	var pips := Control.new()
-	pips.custom_minimum_size = Vector2(0, 8)
+	pips.custom_minimum_size = Vector2(0, 10)
+	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pips.draw.connect(func():
 		var gap := 3.0
-		var w := (pips.size.x - gap * (max_lvl - 1)) / max_lvl
+		var pw := (pips.size.x - gap * (max_lvl - 1)) / max_lvl
 		for i in max_lvl:
-			var r := Rect2(i * (w + gap), 1, w, 5)
-			pips.draw_rect(r, color if i < lvl else Color(1, 1, 1, 0.12)))
+			var r := Rect2(i * (pw + gap), 2, pw, 6)
+			pips.draw_rect(r, Art.hdr(color, 1.2) if i < lvl else Color(1, 1, 1, 0.12)))
 	info.add_child(pips)
 	row.add_child(info)
 	UI.body(card).add_child(row)
 
 	var btn: Button
 	if lvl >= max_lvl:
-		btn = UI.button("Máximo", UI.GLASS_TINT, 10)
+		btn = UI.button("Máximo", UI.GLASS_TINT, 12)
 		btn.disabled = true
 	else:
-		btn = UI.button("Melhorar  -  %d" % Save.perma_cost(id), UI.GOLD, 10)
-		btn.disabled = Save.coins < Save.perma_cost(id)
+		var cost := Save.perma_cost(id)
+		btn = UI.button("Melhorar   ◎ %d" % cost, UI.GOLD, 13)
+		btn.disabled = not Save.can_afford(cost)
 		btn.pressed.connect(func():
 			if Save.buy_perma(id):
 				_sfx.play("buy")
 				_rebuild())
-	btn.custom_minimum_size.y = 34
+	btn.custom_minimum_size.y = 40
 	UI.body(card).add_child(btn)
 	return card
 
 
+# ---------------------------------------------------------------- actions
+
 func _open_settings() -> void:
 	if _settings:
 		return
-	_sfx.play("xp", 1.1)
+	Music.ui("open")
 	_settings = SettingsSheet.build(func():
 		_settings.queue_free()
 		_settings = null)
@@ -442,8 +674,45 @@ func _open_settings() -> void:
 
 func _start(seed_value: int) -> void:
 	Save.next_seed = seed_value
-	_sfx.play("levelup", 0.8)
+	Music.ui("start")
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+
+## Round medallion with an embossed emblem (art/emblems), used for weapons
+## and upgrades.
+class Medallion extends Control:
+	var emblem := ""
+	var color := Color.WHITE
+	var rays := false
+	var dim := false
+	var _t := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(delta: float) -> void:
+		if rays:
+			_t += delta
+			queue_redraw()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5
+		if rays:
+			for i in 12:
+				var a := _t * 0.4 + TAU * i / 12.0
+				var d := Vector2.from_angle(a)
+				var n := d.orthogonal()
+				draw_colored_polygon(PackedVector2Array([c + n * 3.0, c + d * r * 1.25 + n * 9.0, c + d * r * 1.25 - n * 9.0, c - n * 3.0]),
+					Color(color.r, color.g, color.b, 0.12))
+		Art.glow(self, c, r * 1.3, color, 0.3 if dim else 0.55)
+		draw_circle(c, r * 0.92, Color(0.03, 0.02, 0.05, 0.95))
+		draw_circle(c, r * 0.84, Color(color.darkened(0.78), 1.0))
+		draw_arc(c, r * 0.92, 0, TAU, 48, Art.hdr(UI.GOLD, 1.15) if not dim else Color(1, 1, 1, 0.3), maxf(1.5, r * 0.06), true)
+		var tint := Color(0.4, 0.4, 0.45) if dim else Color.WHITE
+		BoonArt.draw_emblem(self, emblem, c, r * 1.45, tint)
+		if dim:
+			UI.draw_icon(self, "lock", c + Vector2(r * 0.55, r * 0.55), r * 0.28, Color(1, 1, 1, 0.85))
 
 
 class HeroStage extends Node2D:
@@ -460,6 +729,7 @@ class HeroStage extends Node2D:
 			add_child(b)
 		if HeroSprite.available():
 			_hero = HeroSprite.new()
+			_hero.showcase = true
 			_hero.position = Vector2(0, -2)
 			_hero.z_index = 1
 			add_child(_hero)
